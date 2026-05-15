@@ -1,0 +1,14 @@
+{
+    "servers": [
+        {
+            "host": "127.0.0.1",
+            "ports": [
+                8080
+            ],
+            "serverName": "localhost",
+            "clientMaxBodySize": 1000000,
+            "root": "./www",
+            "index": "index.html"
+        }
+    ]
+}
