@@ -1,5 +1,8 @@
 package server;
 
+import http.HttpParser;
+import http.HttpRequest;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
@@ -106,14 +109,25 @@ public class Server {
 
             String rawRequest = StandardCharsets.UTF_8.decode(readBuffer).toString();
 
-            System.out.println("----- RAW HTTP REQUEST -----");
-            System.out.println(rawRequest);
-            System.out.println("----------------------------");
+            HttpParser parser = new HttpParser();
+            HttpRequest request = parser.parse(rawRequest);
+
+            System.out.println("----- PARSED HTTP REQUEST -----");
+            System.out.println("Method: " + request.getMethod());
+            System.out.println("Path: " + request.getPath());
+            System.out.println("Query: " + request.getQueryString());
+            System.out.println("Version: " + request.getVersion());
+            System.out.println("Host: " + request.getHeader("Host"));
+            System.out.println("Body: " + request.getBody());
+            System.out.println("-------------------------------");
 
             readBuffer.clear();
 
             closeClient(key);
 
+        } catch (IllegalArgumentException e) {
+            System.err.println("Bad request: " + e.getMessage());
+            closeClient(key);
         } catch (IOException e) {
             System.err.println("Read error: " + e.getMessage());
             closeClient(key);
