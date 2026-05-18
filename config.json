@@ -1,12 +1,73 @@
 {
-    "servers": [
+    "host": "127.0.0.1",
+    "server_names": [
+        "localhost",
+        "test.com"
+    ],
+    "ports": [
+        8080,
+        8081
+    ],
+    "client_max_body_size": 1048576,
+    "client_timeout_ms": 10000,
+    "upload_dir": "./uploads",
+    "log_directory": "./logs",
+    "error_pages": {
+        "400": "./error_pages/400.html",
+        "403": "./error_pages/403.html",
+        "404": "./error_pages/404.html",
+        "405": "./error_pages/405.html",
+        "413": "./error_pages/413.html",
+        "500": "./error_pages/500.html"
+    },
+    "routes": [
         {
-            "host": "127.0.0.1",
-            "ports": [
-                8080
+            "path": "/old",
+            "methods": [
+                "GET"
             ],
-            "serverName": "localhost",
-            "clientMaxBodySize": 1000000,
+            "redirect": {
+                "status": 301,
+                "to": "/"
+            }
+        },
+        {
+            "path": "/cgi",
+            "methods": [
+                "GET",
+                "POST"
+            ],
+            "root": "./cgi-bin",
+            "index": "test.py",
+            "cgi": {
+                ".py": "python3"
+            }
+        },
+        {
+            "path": "/uploads",
+            "methods": [
+                "GET",
+                "POST",
+                "DELETE"
+            ],
+            "root": "./uploads",
+            "upload_dir": "./uploads",
+            "index": "index.html",
+            "directory_listing": true
+        },
+        {
+            "path": "/admin",
+            "methods": [
+                "GET"
+            ],
+            "root": "./admin",
+            "index": "index.html"
+        },
+        {
+            "path": "/",
+            "methods": [
+                "GET"
+            ],
             "root": "./www",
             "index": "index.html"
         }
