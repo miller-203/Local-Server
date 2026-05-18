@@ -58,17 +58,34 @@ public class Server {
         selector = Selector.open();
         router = new Router(metrics, sessionManager);
 
+        int boundListeners = 0;
+
         for (ServerConfig.ListenAddress address : config.getListenAddresses()) {
-            ServerSocketChannel serverChannel = ServerSocketChannel.open();
-            serverChannel.configureBlocking(false);
-            serverChannel.bind(new InetSocketAddress(address.host(), address.port()));
+            ServerSocketChannel serverChannel = null;
 
-            SelectionKey serverKey = serverChannel.register(selector, SelectionKey.OP_ACCEPT);
-            serverKey.attach(address);
+            try {
+                serverChannel = ServerSocketChannel.open();
+                serverChannel.configureBlocking(false);
+                serverChannel.bind(new InetSocketAddress(address.host(), address.port()));
 
-            String message = "Server listening on http://" + address.host() + ":" + address.port();
-            logger.server(message);
-            System.out.println(message);
+                SelectionKey serverKey = serverChannel.register(selector, SelectionKey.OP_ACCEPT);
+                serverKey.attach(address);
+                boundListeners++;
+
+                String message = "Server listening on http://" + address.host() + ":" + address.port();
+                logger.server(message);
+                System.out.println(message);
+            } catch (IOException e) {
+                if (serverChannel != null) {
+                    serverChannel.close();
+                }
+
+                logError("Failed to bind " + address.host() + ":" + address.port(), e);
+            }
+        }
+
+        if (boundListeners == 0) {
+            throw new IOException("No listening sockets could be opened");
         }
     }
 
@@ -95,7 +112,7 @@ public class Server {
                     } else if (key.isWritable()) {
                         writeToClient(key);
                     }
-                } catch (IOException e) {
+                } catch (IOException | RuntimeException e) {
                     logError("Socket error", e);
                     closeClient(key);
                 }

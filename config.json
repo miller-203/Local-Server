@@ -40,7 +40,8 @@
             "root": "./cgi-bin",
             "index": "test.py",
             "cgi": {
-                ".py": "python3"
+                ".py": "python3",
+                ".pl": "perl"
             }
         },
         {

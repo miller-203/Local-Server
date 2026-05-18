@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -62,6 +63,9 @@ public class CgiHandler {
             env.put("SCRIPT_NAME", route.getPath() + "/" + match.scriptRelativePath());
             env.put("SCRIPT_FILENAME", script.toString());
             env.put("PATH_INFO", match.pathInfo());
+            env.put("PATH_TRANSLATED", translatedPath(root, match.pathInfo()).toString());
+            env.put("REQUEST_URI", request.getPath()
+                    + (request.getQueryString().isBlank() ? "" : "?" + request.getQueryString()));
             env.put("HTTP_COOKIE", valueOrEmpty(request.getHeader("Cookie")));
 
             Process process = builder.start();
@@ -108,6 +112,11 @@ public class CgiHandler {
             }
 
             int scriptEnd = extensionIndex + extension.length();
+
+            if (scriptEnd < cleanPath.length() && cleanPath.charAt(scriptEnd) != '/') {
+                continue;
+            }
+
             String script = cleanPath.substring(0, scriptEnd);
             String pathInfo = cleanPath.substring(scriptEnd);
 
@@ -154,7 +163,7 @@ public class CgiHandler {
         byte[] body = text.substring(separator + separatorLength).getBytes(StandardCharsets.ISO_8859_1);
         int status = 200;
         String reason = "OK";
-        HttpResponse response = null;
+        Map<String, String> headers = new LinkedHashMap<>();
 
         for (String line : headerText.split("\\r?\\n")) {
             int colon = line.indexOf(':');
@@ -173,15 +182,13 @@ public class CgiHandler {
                 continue;
             }
 
-            if (response == null) {
-                response = new HttpResponse(status, reason, body);
-            }
-
-            response.addHeader(name, value);
+            headers.put(name, value);
         }
 
-        if (response == null) {
-            response = new HttpResponse(status, reason, body);
+        HttpResponse response = new HttpResponse(status, reason, body);
+
+        for (Map.Entry<String, String> header : headers.entrySet()) {
+            response.addHeader(header.getKey(), header.getValue());
         }
 
         if (!response.getHeaders().containsKey("Content-Type")) {
@@ -202,6 +209,11 @@ public class CgiHandler {
 
     private String valueOrEmpty(String value) {
         return value == null ? "" : value;
+    }
+
+    private Path translatedPath(Path root, String pathInfo) {
+        String relativePath = pathInfo.startsWith("/") ? pathInfo.substring(1) : pathInfo;
+        return root.resolve(relativePath).normalize();
     }
 
     private record CgiMatch(String scriptRelativePath, String pathInfo, String command) {

@@ -18,7 +18,10 @@ import java.util.Set;
 public class LocalServerTests {
     public static void main(String[] args) throws Exception {
         testParserCookies();
+        testSingleAndMultiplePortConfig();
         testDuplicatePortConfig();
+        testVirtualHostConfigValidation();
+        testInvalidServerBlockDoesNotKillValidServers();
         testRoutesMethodsUploadsDeleteRedirectAndCgi();
         System.out.println("All LocalServer tests passed");
     }
@@ -41,6 +44,43 @@ public class LocalServerTests {
         assertEquals("hello", request.getBody(), "body");
     }
 
+    private static void testSingleAndMultiplePortConfig() throws Exception {
+        Path single = Files.createTempFile("localserver-single-", ".json");
+        Files.writeString(single, """
+                {
+                  "host": "127.0.0.1",
+                  "ports": [8080],
+                  "client_max_body_size": 128,
+                  "error_pages": {"404": "./error_pages/404.html"},
+                  "routes": [
+                    {"path": "/", "methods": ["GET"], "root": ".", "index": "index.html"}
+                  ]
+                }
+                """);
+
+        assertEquals(1, new ConfigLoader().load(single.toString()).getPorts().size(), "single port config");
+        assertEquals(128L, new ConfigLoader().load(single.toString()).getServers().get(0).getClientMaxBodySize(),
+                "body limit config");
+        assertEquals("./error_pages/404.html",
+                new ConfigLoader().load(single.toString()).getServers().get(0).getErrorPages().get(404),
+                "error page config");
+        Files.deleteIfExists(single);
+
+        Path multiple = Files.createTempFile("localserver-multi-", ".json");
+        Files.writeString(multiple, """
+                {
+                  "host": "127.0.0.1",
+                  "ports": [8080, 8081],
+                  "routes": [
+                    {"path": "/", "methods": ["GET"], "root": ".", "index": "index.html"}
+                  ]
+                }
+                """);
+
+        assertEquals(2, new ConfigLoader().load(multiple.toString()).getPorts().size(), "multiple port config");
+        Files.deleteIfExists(multiple);
+    }
+
     private static void testDuplicatePortConfig() throws Exception {
         Path config = Files.createTempFile("localserver-config-", ".json");
         Files.writeString(config, """
@@ -57,6 +97,82 @@ public class LocalServerTests {
         Files.deleteIfExists(config);
     }
 
+    private static void testVirtualHostConfigValidation() throws Exception {
+        Path sharedPortConfig = Files.createTempFile("localserver-vhosts-", ".json");
+        Files.writeString(sharedPortConfig, """
+                {
+                  "servers": [
+                    {
+                      "host": "127.0.0.1",
+                      "ports": [8080],
+                      "server_names": ["one.local"],
+                      "routes": [{"path": "/", "methods": ["GET"], "root": ".", "index": "index.html"}]
+                    },
+                    {
+                      "host": "127.0.0.1",
+                      "ports": [8080],
+                      "server_names": ["two.local"],
+                      "routes": [{"path": "/", "methods": ["GET"], "root": ".", "index": "index.html"}]
+                    }
+                  ]
+                }
+                """);
+
+        assertEquals(2, new ConfigLoader().load(sharedPortConfig.toString()).getServers().size(),
+                "shared port virtual hosts");
+        Files.deleteIfExists(sharedPortConfig);
+
+        Path duplicateNameConfig = Files.createTempFile("localserver-vhosts-duplicate-", ".json");
+        Files.writeString(duplicateNameConfig, """
+                {
+                  "servers": [
+                    {
+                      "host": "127.0.0.1",
+                      "ports": [8080],
+                      "server_names": ["same.local"],
+                      "routes": [{"path": "/", "methods": ["GET"], "root": ".", "index": "index.html"}]
+                    },
+                    {
+                      "host": "127.0.0.1",
+                      "ports": [8080],
+                      "server_names": ["same.local"],
+                      "routes": [{"path": "/", "methods": ["GET"], "root": ".", "index": "index.html"}]
+                    }
+                  ]
+                }
+                """);
+
+        assertThrows(() -> new ConfigLoader().load(duplicateNameConfig.toString()),
+                "duplicate shared-port virtual host");
+        Files.deleteIfExists(duplicateNameConfig);
+    }
+
+    private static void testInvalidServerBlockDoesNotKillValidServers() throws Exception {
+        Path config = Files.createTempFile("localserver-partial-", ".json");
+        Files.writeString(config, """
+                {
+                  "servers": [
+                    {
+                      "host": "127.0.0.1",
+                      "ports": [8080],
+                      "server_names": ["valid.local"],
+                      "routes": [{"path": "/", "methods": ["GET"], "root": ".", "index": "index.html"}]
+                    },
+                    {
+                      "host": "127.0.0.1",
+                      "ports": [8081],
+                      "server_names": ["bad.local"],
+                      "routes": [{"path": "/", "methods": ["PATCH"], "root": ".", "index": "index.html"}]
+                    }
+                  ]
+                }
+                """);
+
+        assertEquals(1, new ConfigLoader().load(config.toString()).getServers().size(),
+                "invalid server block ignored");
+        Files.deleteIfExists(config);
+    }
+
     private static void testRoutesMethodsUploadsDeleteRedirectAndCgi() throws Exception {
         Path root = Files.createTempDirectory("localserver-www-");
         Path uploads = Files.createTempDirectory("localserver-uploads-");
@@ -67,6 +183,11 @@ public class LocalServerTests {
                 printf 'Content-Type: text/plain\\r\\n\\r\\n'
                 printf "$REQUEST_METHOD:$QUERY_STRING:"
                 cat
+                """);
+        Files.writeString(cgiRoot.resolve("status.sh"), """
+                printf 'Content-Type: text/plain\\r\\n'
+                printf 'Status: 201 Created\\r\\n\\r\\n'
+                printf 'created'
                 """);
 
         VirtualServerConfig server = new VirtualServerConfig(
@@ -146,6 +267,14 @@ public class LocalServerTests {
                 sessions.resolve(request("POST", "/cgi/test.sh/info", "a=1", "chunk")));
         assertEquals(200, cgi.getStatusCode(), "cgi status");
         assertEquals("POST:a=1:chunk", new String(cgi.getBody(), StandardCharsets.UTF_8), "cgi output");
+
+        HttpResponse cgiStatus = router.route(request("GET", "/cgi/status.sh", null, null), server,
+                sessions.resolve(request("GET", "/cgi/status.sh", null, null)));
+        assertEquals(201, cgiStatus.getStatusCode(), "cgi Status header");
+
+        HttpResponse cgiExtensionGuard = router.route(request("GET", "/cgi/test.shx", null, null), server,
+                sessions.resolve(request("GET", "/cgi/test.shx", null, null)));
+        assertEquals(404, cgiExtensionGuard.getStatusCode(), "cgi extension boundary");
     }
 
     private static HttpRequest request(String method, String path, String query, String body) {

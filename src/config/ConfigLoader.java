@@ -37,6 +37,7 @@ public class ConfigLoader {
             servers = List.of(parseServer(root, root));
         }
 
+        validateVirtualHostConflicts(servers);
         return new ServerConfig(servers, timeout, logDirectory);
     }
 
@@ -115,7 +116,7 @@ public class ConfigLoader {
 
     private Set<String> parseServerNames(Map<String, Object> server, String host) {
         Set<String> names = new LinkedHashSet<>();
-        names.add(host.toLowerCase(Locale.ROOT));
+        boolean hasExplicitNames = server.containsKey("server_name") || server.containsKey("server_names");
 
         if (server.containsKey("server_name")) {
             names.add(getString(server, "server_name", host).toLowerCase(Locale.ROOT));
@@ -127,7 +128,11 @@ public class ConfigLoader {
             }
         }
 
-        names.add("localhost");
+        if (!hasExplicitNames) {
+            names.add(host.toLowerCase(Locale.ROOT));
+            names.add("localhost");
+        }
+
         return names;
     }
 
@@ -277,6 +282,24 @@ public class ConfigLoader {
 
         if (bodyLimit < 0) {
             throw new IllegalArgumentException("Client body limit cannot be negative");
+        }
+    }
+
+    private void validateVirtualHostConflicts(List<VirtualServerConfig> servers) {
+        Set<String> seen = new HashSet<>();
+
+        for (VirtualServerConfig server : servers) {
+            for (int port : server.getPorts()) {
+                for (String serverName : server.getServerNames()) {
+                    String key = server.getHost() + ":" + port + ":" + serverName;
+
+                    if (!seen.add(key)) {
+                        throw new IllegalArgumentException(
+                                "Duplicate virtual server for " + server.getHost() + ":" + port
+                                        + " and name " + serverName);
+                    }
+                }
+            }
         }
     }
 
