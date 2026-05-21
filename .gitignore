@@ -1,4 +1,3 @@
 out/
-logs/*.log
 uploads/*
 !uploads/.gitkeep

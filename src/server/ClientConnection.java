@@ -12,12 +12,7 @@ public class ClientConnection {
     private final int listenPort;
     private final String remoteAddress;
     private ByteBuffer writeBuffer;
-    private int responseStatusCode;
-    private String requestMethod;
-    private String requestPath;
-    private long requestStartedAt;
 
-    private final long connectedAt;
     private long lastActiveAt;
 
     public ClientConnection(SocketChannel channel, String listenHost, int listenPort, String remoteAddress) {
@@ -28,14 +23,9 @@ public class ClientConnection {
         this.listenPort = listenPort;
         this.remoteAddress = remoteAddress;
         this.writeBuffer = null;
-        this.responseStatusCode = 0;
-        this.requestMethod = "";
-        this.requestPath = "";
 
         long now = System.currentTimeMillis();
-        this.connectedAt = now;
         this.lastActiveAt = now;
-        this.requestStartedAt = now;
     }
 
     public SocketChannel getChannel() {
@@ -74,38 +64,6 @@ public class ClientConnection {
 
     public void setWriteBuffer(ByteBuffer writeBuffer) {
         this.writeBuffer = writeBuffer;
-    }
-
-    public int getResponseStatusCode() {
-        return responseStatusCode;
-    }
-
-    public void setResponseStatusCode(int responseStatusCode) {
-        this.responseStatusCode = responseStatusCode;
-    }
-
-    public String getRequestMethod() {
-        return requestMethod;
-    }
-
-    public void setRequestMethod(String requestMethod) {
-        this.requestMethod = requestMethod;
-    }
-
-    public String getRequestPath() {
-        return requestPath;
-    }
-
-    public void setRequestPath(String requestPath) {
-        this.requestPath = requestPath;
-    }
-
-    public long getRequestStartedAt() {
-        return requestStartedAt;
-    }
-
-    public long getConnectedAt() {
-        return connectedAt;
     }
 
     public long getLastActiveAt() {

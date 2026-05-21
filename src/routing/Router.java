@@ -7,10 +7,8 @@ import handlers.StaticFileHandler;
 import http.HttpRequest;
 import http.HttpResponse;
 import http.HttpStatus;
-import utils.Metrics;
 import utils.SessionManager;
 
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -18,18 +16,10 @@ import java.util.List;
 public class Router {
     private final ErrorResponseFactory errors;
     private final StaticFileHandler handler;
-    private final Metrics metrics;
-    private final SessionManager sessions;
-
-    public Router(Metrics metrics, SessionManager sessions) {
-        this.errors = new ErrorResponseFactory();
-        this.handler = new StaticFileHandler(errors);
-        this.metrics = metrics;
-        this.sessions = sessions;
-    }
 
     public Router() {
-        this(new Metrics(), new SessionManager());
+        this.errors = new ErrorResponseFactory();
+        this.handler = new StaticFileHandler(errors);
     }
 
     public HttpResponse route(
@@ -37,15 +27,6 @@ public class Router {
             VirtualServerConfig server,
             SessionManager.SessionContext sessionContext) {
         trackSessionRequest(sessionContext);
-
-        if ("/metrics".equals(request.getPath())) {
-            HttpResponse response = new HttpResponse(
-                    200,
-                    "OK",
-                    metrics.toJson(sessions.size()).getBytes(StandardCharsets.UTF_8));
-            response.addHeader("Content-Type", "application/json; charset=UTF-8");
-            return response;
-        }
 
         List<Route> routes = routesFor(server);
         Route matchedRoute = findRoute(routes, request.getPath());

@@ -11,7 +11,6 @@
     "client_max_body_size": 1048576,
     "client_timeout_ms": 10000,
     "upload_dir": "./uploads",
-    "log_directory": "./logs",
     "error_pages": {
         "400": "./error_pages/400.html",
         "403": "./error_pages/403.html",
@@ -40,8 +39,7 @@
             "root": "./cgi-bin",
             "index": "test.py",
             "cgi": {
-                ".py": "python3",
-                ".pl": "perl"
+                ".py": "python3"
             }
         },
         {
@@ -55,14 +53,6 @@
             "upload_dir": "./uploads",
             "index": "index.html",
             "directory_listing": true
-        },
-        {
-            "path": "/admin",
-            "methods": [
-                "GET"
-            ],
-            "root": "./admin",
-            "index": "index.html"
         },
         {
             "path": "/",

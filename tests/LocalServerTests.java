@@ -6,7 +6,6 @@ import http.HttpParser;
 import http.HttpRequest;
 import http.HttpResponse;
 import routing.Router;
-import utils.Metrics;
 import utils.SessionManager;
 
 import java.nio.charset.StandardCharsets;
@@ -118,8 +117,20 @@ public class LocalServerTests {
                 }
                 """);
 
-        assertEquals(2, new ConfigLoader().load(sharedPortConfig.toString()).getServers().size(),
-                "shared port virtual hosts");
+        var sharedPortServers = new ConfigLoader().load(sharedPortConfig.toString());
+        assertEquals(2, sharedPortServers.getServers().size(), "shared port virtual hosts");
+        assertEquals(true,
+                sharedPortServers.findVirtualServer("127.0.0.1", 8080, "one.local").getServerNames()
+                        .contains("one.local"),
+                "shared port host one");
+        assertEquals(true,
+                sharedPortServers.findVirtualServer("127.0.0.1", 8080, "two.local").getServerNames()
+                        .contains("two.local"),
+                "shared port host two");
+        assertEquals(true,
+                sharedPortServers.findVirtualServer("127.0.0.1", 8080, "unknown.local").getServerNames()
+                        .contains("one.local"),
+                "shared port default server");
         Files.deleteIfExists(sharedPortConfig);
 
         Path duplicateNameConfig = Files.createTempFile("localserver-vhosts-duplicate-", ".json");
@@ -235,7 +246,7 @@ public class LocalServerTests {
                 uploads.toString());
 
         SessionManager sessions = new SessionManager();
-        Router router = new Router(new Metrics(), sessions);
+        Router router = new Router();
 
         HttpResponse get = router.route(request("GET", "/", null, null), server, sessions.resolve(request("GET", "/", null, null)));
         assertEquals(200, get.getStatusCode(), "GET /");

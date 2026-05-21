@@ -27,7 +27,6 @@ public class ConfigLoader {
 
         Map<String, Object> root = castObject(rootObject);
         int timeout = getInt(root, "client_timeout_ms", DEFAULT_CLIENT_TIMEOUT_MILLIS);
-        String logDirectory = getString(root, "log_directory", "./logs");
 
         List<VirtualServerConfig> servers;
 
@@ -38,7 +37,7 @@ public class ConfigLoader {
         }
 
         validateVirtualHostConflicts(servers);
-        return new ServerConfig(servers, timeout, logDirectory);
+        return new ServerConfig(servers, timeout);
     }
 
     private List<VirtualServerConfig> parseServers(Map<String, Object> root) {

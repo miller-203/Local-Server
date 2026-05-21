@@ -29,10 +29,6 @@ public class SessionManager {
         return new SessionContext(session, fresh);
     }
 
-    public int size() {
-        return sessions.size();
-    }
-
     private String newSessionId() {
         byte[] bytes = new byte[24];
         random.nextBytes(bytes);

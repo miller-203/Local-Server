@@ -7,8 +7,6 @@ import http.HttpParser;
 import http.HttpRequest;
 import http.HttpResponse;
 import routing.Router;
-import utils.Metrics;
-import utils.ServerLogger;
 import utils.SessionManager;
 
 import java.io.ByteArrayOutputStream;
@@ -29,18 +27,15 @@ public class Server {
     private final ServerConfig config;
     private final HttpParser parser;
     private final ErrorResponseFactory errors;
-    private final Metrics metrics;
     private final SessionManager sessionManager;
 
     private Selector selector;
     private Router router;
-    private ServerLogger logger;
 
     public Server(ServerConfig config) {
         this.config = config;
         this.parser = new HttpParser();
         this.errors = new ErrorResponseFactory();
-        this.metrics = new Metrics();
         this.sessionManager = new SessionManager();
     }
 
@@ -54,9 +49,8 @@ public class Server {
     }
 
     private void setupServer() throws IOException {
-        logger = new ServerLogger(config.getLogDirectory());
         selector = Selector.open();
-        router = new Router(metrics, sessionManager);
+        router = new Router();
 
         int boundListeners = 0;
 
@@ -73,7 +67,6 @@ public class Server {
                 boundListeners++;
 
                 String message = "Server listening on http://" + address.host() + ":" + address.port();
-                logger.server(message);
                 System.out.println(message);
             } catch (IOException e) {
                 if (serverChannel != null) {
@@ -139,7 +132,6 @@ public class Server {
 
         SelectionKey clientKey = clientChannel.register(selector, SelectionKey.OP_READ);
         clientKey.attach(connection);
-        metrics.connectionAccepted();
     }
 
     private void readFromClient(SelectionKey key) throws IOException {
@@ -170,12 +162,12 @@ public class Server {
         }
 
         if (result.status() == RequestReadStatus.BAD_REQUEST) {
-            prepareResponse(key, connection, errorResponse(connection, 400), null);
+            prepareResponse(key, connection, errorResponse(connection, 400));
             return;
         }
 
         if (result.status() == RequestReadStatus.BODY_TOO_LARGE) {
-            prepareResponse(key, connection, errorResponse(connection, 413), null);
+            prepareResponse(key, connection, errorResponse(connection, 413));
             return;
         }
 
@@ -188,7 +180,7 @@ public class Server {
             response.addHeader("Set-Cookie", sessionContext.setCookieHeader());
         }
 
-        prepareResponse(key, connection, response, request);
+        prepareResponse(key, connection, response);
     }
 
     private RequestReadResult tryReadRequest(ClientConnection connection) {
@@ -372,33 +364,14 @@ public class Server {
             return;
         }
 
-        long duration = System.currentTimeMillis() - connection.getRequestStartedAt();
-        metrics.responseCompleted(connection.getResponseStatusCode());
-
-        if (logger != null) {
-            logger.request(
-                    connection.getRemoteAddress(),
-                    connection.getRequestMethod(),
-                    connection.getRequestPath(),
-                    connection.getResponseStatusCode(),
-                    duration);
-        }
-
         closeClient(key);
     }
 
     private void prepareResponse(
             SelectionKey key,
             ClientConnection connection,
-            HttpResponse response,
-            HttpRequest request) {
+            HttpResponse response) {
         connection.setWriteBuffer(ByteBuffer.wrap(response.toBytes()));
-        connection.setResponseStatusCode(response.getStatusCode());
-
-        if (request != null) {
-            connection.setRequestMethod(request.getMethod());
-            connection.setRequestPath(request.getPath());
-        }
 
         key.interestOps(SelectionKey.OP_WRITE);
     }
@@ -429,7 +402,6 @@ public class Server {
         try {
             if (key.attachment() instanceof ClientConnection connection) {
                 connection.getChannel().close();
-                metrics.connectionClosed();
             }
 
             key.cancel();
@@ -501,11 +473,7 @@ public class Server {
     }
 
     private void logError(String message, Throwable throwable) {
-        if (logger != null) {
-            logger.error(message, throwable);
-        } else {
-            System.err.println(message + ": " + throwable.getMessage());
-        }
+        System.err.println(message + ": " + throwable.getMessage());
     }
 
     private enum RequestReadStatus {

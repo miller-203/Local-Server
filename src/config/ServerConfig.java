@@ -8,7 +8,6 @@ import java.util.Set;
 public class ServerConfig {
     private final List<VirtualServerConfig> servers;
     private final int clientTimeoutMillis;
-    private final String logDirectory;
 
     public ServerConfig(String host, List<Integer> ports, List<RouteConfig> routes) {
         this(
@@ -20,14 +19,12 @@ public class ServerConfig {
                         java.util.Map.of(),
                         1_048_576L,
                         "./uploads")),
-                10_000,
-                "./logs");
+                10_000);
     }
 
-    public ServerConfig(List<VirtualServerConfig> servers, int clientTimeoutMillis, String logDirectory) {
+    public ServerConfig(List<VirtualServerConfig> servers, int clientTimeoutMillis) {
         this.servers = servers;
         this.clientTimeoutMillis = clientTimeoutMillis;
-        this.logDirectory = logDirectory;
     }
 
     public String getHost() {
@@ -48,10 +45,6 @@ public class ServerConfig {
 
     public int getClientTimeoutMillis() {
         return clientTimeoutMillis;
-    }
-
-    public String getLogDirectory() {
-        return logDirectory;
     }
 
     public Set<ListenAddress> getListenAddresses() {
