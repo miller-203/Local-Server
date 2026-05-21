@@ -112,6 +112,7 @@ Open either URL in a browser to test static file serving.
 Run the local test harness:
 
 ```bash
+javac -d out $(find src -name '*.java')
 javac -cp out -d out tests/LocalServerTests.java
 java -cp out LocalServerTests
 ```
