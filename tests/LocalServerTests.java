@@ -190,15 +190,21 @@ public class LocalServerTests {
         Path cgiRoot = Files.createTempDirectory("localserver-cgi-");
 
         Files.writeString(root.resolve("index.html"), "<h1>Hello</h1>");
-        Files.writeString(cgiRoot.resolve("test.sh"), """
-                printf 'Content-Type: text/plain\\r\\n\\r\\n'
-                printf "$REQUEST_METHOD:$QUERY_STRING:"
-                cat
+        Files.writeString(cgiRoot.resolve("test.py"), """
+                import os
+                import sys
+
+                body = sys.stdin.read()
+                print("Content-Type: text/plain")
+                print()
+                sys.stdout.write(os.environ.get("REQUEST_METHOD", "") + ":"
+                        + os.environ.get("QUERY_STRING", "") + ":" + body)
                 """);
-        Files.writeString(cgiRoot.resolve("status.sh"), """
-                printf 'Content-Type: text/plain\\r\\n'
-                printf 'Status: 201 Created\\r\\n\\r\\n'
-                printf 'created'
+        Files.writeString(cgiRoot.resolve("status.py"), """
+                print("Content-Type: text/plain")
+                print("Status: 201 Created")
+                print()
+                print("created", end="")
                 """);
 
         VirtualServerConfig server = new VirtualServerConfig(
@@ -225,7 +231,7 @@ public class LocalServerTests {
                                 null,
                                 null,
                                 null,
-                                Map.of(".sh", "sh")),
+                                Map.of(".py", "python3")),
                         new RouteConfig(
                                 "/uploads",
                                 Set.of("GET", "POST", "DELETE"),
@@ -274,17 +280,17 @@ public class LocalServerTests {
         assertEquals(301, redirect.getStatusCode(), "redirect status");
         assertEquals("/", redirect.getHeaders().get("Location"), "redirect location");
 
-        HttpResponse cgi = router.route(request("POST", "/cgi/test.sh/info", "a=1", "chunk"), server,
-                sessions.resolve(request("POST", "/cgi/test.sh/info", "a=1", "chunk")));
+        HttpResponse cgi = router.route(request("POST", "/cgi/test.py/info", "a=1", "chunk"), server,
+                sessions.resolve(request("POST", "/cgi/test.py/info", "a=1", "chunk")));
         assertEquals(200, cgi.getStatusCode(), "cgi status");
         assertEquals("POST:a=1:chunk", new String(cgi.getBody(), StandardCharsets.UTF_8), "cgi output");
 
-        HttpResponse cgiStatus = router.route(request("GET", "/cgi/status.sh", null, null), server,
-                sessions.resolve(request("GET", "/cgi/status.sh", null, null)));
+        HttpResponse cgiStatus = router.route(request("GET", "/cgi/status.py", null, null), server,
+                sessions.resolve(request("GET", "/cgi/status.py", null, null)));
         assertEquals(201, cgiStatus.getStatusCode(), "cgi Status header");
 
-        HttpResponse cgiExtensionGuard = router.route(request("GET", "/cgi/test.shx", null, null), server,
-                sessions.resolve(request("GET", "/cgi/test.shx", null, null)));
+        HttpResponse cgiExtensionGuard = router.route(request("GET", "/cgi/test.pyx", null, null), server,
+                sessions.resolve(request("GET", "/cgi/test.pyx", null, null)));
         assertEquals(404, cgiExtensionGuard.getStatusCode(), "cgi extension boundary");
     }
 
